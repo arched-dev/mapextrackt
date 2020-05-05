@@ -34,3 +34,19 @@ img
 
 ```
 ![Example Output](./examples/example_output.jpg "Example Output")
+
+### View Individual Cells Or Layers At a Time
+
+```python
+
+#gather maps
+img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=True)
+img.save("example_output.jpg")
+img
+
+```
+![Example Output](./examples/example_output.jpg "Example Output")
+
+<a href="https://www.youtube.com/watch?v=awBDPjCNAi4&feature=youtu.be" target="_blank">
+    <img src="./examples/youtube.jpg" alt="IMAGE ALT TEXT HERE" border="10" />
+</a>
