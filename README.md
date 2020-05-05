@@ -47,17 +47,6 @@ img
 ```
 ![Example Output](./examples/example_output2.jpg "Example Output")
 
-```python
-
-#gather maps
-img = fe.display_from_map(layer_no=5, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=False)
-img.save("example_output.jpg")
-img
-
-```
-![Example Output](./examples/example_output1.jpg "Example Output")
-
-
 
 ### Export Cells Of Each Layer To Video
 
@@ -76,4 +65,28 @@ fe.write_video(out_size=(1000,500), file_name="output.mp4", colourize=20,
 </a>
 
 
-# Installtion
+------------------------------------------------
+
+# Installation
+
+## Is as easy as pie 
+
+```
+pip install mapextrakt
+```
+
+or build from source in terminal 
+
+```
+git clone https://github.com/lewis-morris/mapextrackt
+cd mapextrackt
+pip install -e .
+```
+
+------------------------------------------------
+
+# More Examples
+
+Why not view the jupyter notebook with more examples of usage.
+
+[Examples](./examples/examples.ipynb)
