@@ -35,18 +35,45 @@ img
 ```
 ![Example Output](./examples/example_output.jpg "Example Output")
 
-### View Individual Cells Or Layers At a Time
+### View Layers At a Time
 
 ```python
 
 #gather maps
-img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=True)
+img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=False)
 img.save("example_output.jpg")
 img
 
 ```
-![Example Output](./examples/example_output.jpg "Example Output")
+![Example Output](./examples/example_output2.jpg "Example Output")
+
+```python
+
+#gather maps
+img = fe.display_from_map(layer_no=5, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=False)
+img.save("example_output.jpg")
+img
+
+```
+![Example Output](./examples/example_output1.jpg "Example Output")
+
+
+
+### Export Cells Of Each Layer To Video
+
+```python
+
+#gather maps
+fe.write_video(out_size=(1000,500), file_name="output.mp4", colourize=20,
+               border=0.03, fps=60, frames_per_cell=1, fade_frames_between_cells=6,
+               write_text=True, picture_in_picture=True)
+
+
+```
 
 <a href="https://www.youtube.com/watch?v=awBDPjCNAi4&feature=youtu.be" target="_blank">
-    <img src="./examples/youtube.jpg" alt="IMAGE ALT TEXT HERE" border="10" />
+    <img src="./examples/youtube.jpg" alt="MapExtrakt" border="10" />
 </a>
+
+
+# Installtion
