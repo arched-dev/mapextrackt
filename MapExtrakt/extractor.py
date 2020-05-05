@@ -239,10 +239,10 @@ class FeatureExtractor:
 
                 if write_text:
                     # if write text displays layer cell and feature size
-                    img = self.__draw_text(img, f"Layer {layer}  Cells {self.get_cells(layer)+1: 4} - "
+                    img = self.__draw_text(img, f"Layer {layer: 3} - Cells {self.get_cells(layer)+1: 4} - "
                                                 f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
-                    img1 = self.__draw_text(img1, f"Layer {layer} - Cells {self.get_cells(layer)+1: 4} - "
+                    img1 = self.__draw_text(img1, f"Layer {layer: 3} - Cells {self.get_cells(layer)+1: 4} - "
                                                   f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                 for times in range(frames_per_layer):
