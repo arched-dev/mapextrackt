@@ -27,7 +27,7 @@ from MapExtrakt import FeatureExtractor
 
 #load the model and image
 fe = FeatureExtractor(model)
-fe.set_image("pug.jpg")
+fe.set_image("cat.jpg")
 
 #gather maps
 img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=True)
@@ -35,7 +35,7 @@ img.save("example_output.jpg")
 img
 
 ```
-![Example Output](./examples/example_output.jpg "Example Output")
+![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/example_output.jpg "Example Output")
 
 ### View Single Cells At a Time
 
@@ -47,7 +47,7 @@ img.save("example_output.jpg")
 img
 
 ```
-![Example Output](./examples/example_output2.jpg "Example Output")
+![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/example_output2.jpg "Example Output")
 
 
 ### Export Cells Of Each Layer To Video
@@ -59,7 +59,7 @@ fe.write_video(out_size=(1000,500), file_name="output.mp4",
 ```
 
 <a href="https://www.youtube.com/watch?v=AvLTVaV5ID8&feature=youtu.be" target="_blank">
-    <img src="./examples/youtube.jpg" alt="MapExtrakt" border="10" />
+    <img src="https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/youtube.jpg" alt="MapExtrakt" border="10" />
 </a>
 
 
