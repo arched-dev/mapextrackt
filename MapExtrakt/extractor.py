@@ -10,12 +10,19 @@ from PIL import Image, ImageFont, ImageDraw
 import os
 
 
-def get_rows_cols(no):
+def get_rows_cols(no,width,height,act_size):
+
+    act_h = act_size[1]
+    act_w = act_size[0]
+    ratio = act_h / act_w
+
+    answers = {}
     for x in range(100):
         for y in range(100):
-            if x * y == no and y * 0.49 < x < y * 1.51:
-                return (x, y)
+            if x * y == no:
+                answers[abs(((x*height)/(y*width))-ratio)] = [x, y]
 
+    return answers[sorted(answers.keys())[0]][0], answers[sorted(answers.keys())[0]][1]
 
 class ResizeMe(object):
 
@@ -119,7 +126,7 @@ class FeatureExtractor:
         self.__has_layers(layer_no)
 
         # get image map
-        img = self.__return_feature_map(layer_no, single=cell_no, border=border, colourize=colourize)
+        img = self.__return_feature_map(layer_no, single=cell_no, border=border, colourize=colourize, out_size=outsize)
 
         # return type
 
@@ -165,7 +172,8 @@ class FeatureExtractor:
         return self.outputs[layer_no].shape[1] - 1
 
     def write_video(self, out_size, file_name, colourize=20, border=0.03, fps=40, frames_per_cell=1,
-                    fade_frames_between_cells=6, write_text=True, picture_in_picture=True):
+                    fade_frames_between_cells=2, write_text=True, picture_in_picture=True,
+                    frames_per_layer=90, fade_frames_per_layer=20, draw_type="layers"):
         """
         Used to render video output from feature maps
 
@@ -178,7 +186,10 @@ class FeatureExtractor:
         :param fade_frames_between_cells: (int) number of frames to fade between cells: more = smoother transition
         :param write_text: (bool) Write layer numbers to output
         :param picture_in_picture: (bool) Draw original image over cell
-        :return:
+        :param frames_per_layer: (int) Frames to draw per layer IF draw_layers == True
+        :param fade_frames_per_layer: Frames to fade between layers IF draw_layers == True
+        :param draw_type: (str) "layers" to only draw layers "cells" to only draw cells "both" to draw both
+        :return: None
         """
 
         # check filename
@@ -186,50 +197,109 @@ class FeatureExtractor:
             raise ValueError("Output filename must end with .mp4")
 
         # set fourcc type
-        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-        fourcc = cv2.VideoWriter_fourcc(*'X264')
+        fourcc = cv2.VideoWriter_fourcc('x', 'v', 'i', 'd')
+        # fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
         # init video writer
         out = cv2.VideoWriter("./" + file_name, fourcc=fourcc, fps=fps, frameSize=out_size)
+
+        # set draw type
+        if draw_type == "layers":
+            draw_layers = True
+            draw_cells = False
+        elif draw_type == "cells":
+            draw_layers = False
+            draw_cells = True
+        elif draw_type == "both":
+            draw_layers = True
+            draw_cells = True
+        else:
+            raise ValueError("Incorrect draw type")
 
         # get counts
         tot = self.get_total_cells()
         count = 0
         start = datetime.datetime.now()
 
-        # loop layers and cells
-        for layer in range(self.layers):
-            for cell in range(self.get_cells(layer)):
-
-                # get image
-                img = self.display_from_map(layer, cell, colourize=colourize, out_type="np", outsize=out_size,
-                                            border=border, picture_in_picture=picture_in_picture)[:, :, ::-1]
-                img1 = self.__get_next_image(layer, cell, colourize=colourize, outsize=out_size, border=border,
-                                             picture_in_picture=picture_in_picture)[:, :, ::-1]
-
-                # write text if needed
+        # if draw layers first
+        if draw_layers:
+            for layer in range(0, self.layers + 1):
+                if layer < self.layers:
+                    img = self.display_from_map(layer_no=layer, out_type="np", colourize=colourize, outsize=out_size,
+                                                border=border,
+                                                picture_in_picture=picture_in_picture)
+                    img1 = self.display_from_map(layer_no=layer + 1, out_type="np", colourize=colourize,
+                                                 outsize=out_size, border=border,
+                                                 picture_in_picture=picture_in_picture)
+                    img1_base = img1.copy()
+                else:
+                    # to deal with last image.
+                    img = img1_base.copy()
+                    img1 = img1_base.copy()
 
                 if write_text:
-                    img = self.__draw_text(img, f"Layer {layer} Cell {cell}")
-                    img1 = self.__draw_text(img1, f"Layer {layer} Cell {cell}")
+                    # if write text displays layer cell and feature size
+                    img = self.__draw_text(img, f"Layer {layer}  Cells {self.get_cells(layer)+1: 4} - "
+                                                f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
-                # write static frames
-                for static in range(frames_per_cell):
-                    out.write(img)
+                    img1 = self.__draw_text(img1, f"Layer {layer} - Cells {self.get_cells(layer)+1: 4} - "
+                                                  f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
-                # get next image
+                for times in range(frames_per_layer):
+                    out.write(img[:, :, ::-1])
 
-                # write fade frames
-                for im in weight_images(img, img1, fade_frames_between_cells):
-                    out.write(im)
-
+                for im in weight_images(img, img1, fade_frames_per_layer):
+                    out.write(im[:, :, ::-1])
                 # logs
                 count += 1
                 total_time = (datetime.datetime.now() - start).total_seconds()
 
                 # print status
                 print(
-                    f"\r{count:<5}/{tot}   Total Time Taken {convert(total_time):10} Time Left {convert((total_time / count) * (tot - count)):10} {get_bar(count, tot)} ",
+                    f"\rDrawing Layers {count:<5}/{self.layers + 1}   Total Time Taken {convert(total_time):10} Time Left"
+                    f" {convert((total_time / count) * (self.layers + 1 - count)):10} {get_bar(count, self.layers + 1)} ",
                     end="")
+
+        count = 0
+        start = datetime.datetime.now()
+
+        # loop layers and cells
+        if draw_cells:
+
+            for layer in range(self.layers):
+                for cell in range(self.get_cells(layer)):
+
+                    # get image
+                    img = self.display_from_map(layer, cell, colourize=colourize, out_type="np", outsize=out_size,
+                                                border=border, picture_in_picture=picture_in_picture)[:, :, ::-1]
+                    img1 = self.__get_next_image(layer, cell, colourize=colourize, outsize=out_size, border=border,
+                                                 picture_in_picture=picture_in_picture)[:, :, ::-1]
+
+                    # write text if needed
+
+                    if write_text:
+                        # if write text displays layer cell and feature size
+                        img = self.__draw_text(img, f"Layer {layer} Cell {cell}   - "
+                                                    f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+                        img1 = self.__draw_text(img, f"Layer {layer} Cell {cell}   - "
+                                                     f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+
+                    # write static frames
+                    for static in range(frames_per_cell):
+                        out.write(img)
+
+                    # write fade frames
+                    for im in weight_images(img, img1, fade_frames_between_cells):
+                        out.write(im)
+
+                    # logs
+                    count += 1
+                    total_time = (datetime.datetime.now() - start).total_seconds()
+
+                    # print status
+                    print(
+                        f"\rDrawing Cells {count:<5}/{tot}   Total Time Taken {convert(total_time):10} Time Left {convert((total_time / count) * (tot - count)):10} {get_bar(count, tot)} ",
+                        end="")
 
         print(f"\nVideo saved as {file_name}")
 
@@ -368,7 +438,7 @@ class FeatureExtractor:
                                                                         int(new_h)))
         return base_img
 
-    def __return_feature_map(self, layer_no, single=None, border=None, colourize=20):
+    def __return_feature_map(self, layer_no, single=None, border=None, colourize=20, out_size=None):
 
         # normalize output for np array
         out = (normalize_output(self.outputs[layer_no][0, :, :, :]) * 255).to("cpu").detach().numpy().astype(
@@ -396,7 +466,7 @@ class FeatureExtractor:
             return img
 
         # get ideal shape of output
-        x, y = get_rows_cols(length)
+        x, y = get_rows_cols(length, width=out.shape[1], height=out.shape[0], act_size=out_size)
 
         count = 0
 
@@ -439,7 +509,7 @@ class FeatureExtractor:
         for i, x in enumerate(tensor.view(1, tensor.size(1), -1).squeeze()):
             pixel_mean[i] = torch.mean(x)
 
-        pixel_mean = {k: v for k, v in sorted(pixel_mean.items(), key=lambda item: item[1])}
+        pixel_mean = {k: v for k, v in sorted(pixel_mean.items(), key=lambda item: item[1], reverse=True)}
 
         return tensor[:, [list(pixel_mean.keys())], :, :]
 
