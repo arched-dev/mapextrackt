@@ -89,7 +89,7 @@ class FeatureExtractor:
 
     def __init__(self, model):
         """
-        Accepts pytorch models for feature extraction.
+        Accepts pytorch models for feature extraction from convolutional layers.
         Must call set_image after to load image before use.
 
         :param model: (pytorch model)
