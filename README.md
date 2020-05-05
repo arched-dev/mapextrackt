@@ -1,18 +1,20 @@
 # MapExtrakt
 
-> Convolutional Nerual Networks Are Beautiful
+> Convolutional Neural Networks Are Beautiful
 
-We all take our eyes for granted, we glance at an object for an instant and  our brains identify objects with ease.
-However distorted this information may be, we do a pretty good job at it.
+We all take our eyes for granted, we glance at an object for an instant and our brains can identify with ease.
+However distorted the information may be, we do a pretty good job at it.
 
-Low light, obscured vision, there are a myriad of situations where conditions are poor but still we manage to understand what an object it.
-Context helps, but we were created with sight in mind.
+Low light, obscured vision, poor eyesight... There are a myriad of situations where conditions are poor but still we manage to understand what an object it.
+Context helps, but we humans were created with sight in mind.
 
-Computers have a harder time, but modern advances with Convolutional Neural Networks are making this task a reality and have now surpassed human level accuracy.
+Computers have a harder time, but modern advances with convolutional neural networks are making this task a reality and have now surpassed human level accuracy.
 
-Computers are beautifull, Convolutional Neural Networks are beautifull. And the maps they create to determine what makes a cat a cat are beautiful.
+Computers are beautiful, neural networks are beautiful. And the maps they create to determine what makes a cat a cat are beautiful.
 
 ### MapExtrakt makes viewing feature maps a breeze.
+
+#### Catch a glimpse of how a computer can see.
 
 ```python
 
@@ -25,7 +27,7 @@ from MapExtrakt import FeatureExtractor
 
 #load the model and image
 fe = FeatureExtractor(model)
-fe.set_image("cat.jpg")
+fe.set_image("pug.jpg")
 
 #gather maps
 img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=True)
@@ -35,7 +37,7 @@ img
 ```
 ![Example Output](./examples/example_output.jpg "Example Output")
 
-### View Layers At a Time
+### View Single Cells At a Time
 
 ```python
 
@@ -51,16 +53,12 @@ img
 ### Export Cells Of Each Layer To Video
 
 ```python
-
 #gather maps
-fe.write_video(out_size=(1000,500), file_name="output.mp4", colourize=20,
-               border=0.03, fps=60, frames_per_cell=1, fade_frames_between_cells=6,
-               write_text=True, picture_in_picture=True)
-
-
+fe.write_video(out_size=(1000,500), file_name="output.mp4", 
+               write_text=True, picture_in_picture=True, draw_type="both")
 ```
 
-<a href="https://www.youtube.com/watch?v=awBDPjCNAi4&feature=youtu.be" target="_blank">
+<a href="https://www.youtube.com/watch?v=AvLTVaV5ID8&feature=youtu.be" target="_blank">
     <img src="./examples/youtube.jpg" alt="MapExtrakt" border="10" />
 </a>
 
@@ -69,7 +67,7 @@ fe.write_video(out_size=(1000,500), file_name="output.mp4", colourize=20,
 
 # Installation
 
-## Is as easy as pie 
+## It's as easy as PyPI
 
 ```
 pip install mapextrakt
@@ -87,6 +85,6 @@ pip install -e .
 
 # More Examples
 
-Why not view the jupyter notebook with more examples of usage.
+For more - view the jupyter notebook with extra usage examples.
 
 [Examples](./examples/examples.ipynb)
