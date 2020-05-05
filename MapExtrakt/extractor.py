@@ -186,7 +186,8 @@ class FeatureExtractor:
             raise ValueError("Output filename must end with .mp4")
 
         # set fourcc type
-        fourcc = cv2.VideoWriter_fourcc('X', 'V', 'I', 'D')
+        fourcc = cv2.VideoWriter_fourcc(*'MP4V')
+        fourcc = cv2.VideoWriter_fourcc(*'X264')
         # init video writer
         out = cv2.VideoWriter("./" + file_name, fourcc=fourcc, fps=fps, frameSize=out_size)
 
@@ -201,9 +202,10 @@ class FeatureExtractor:
 
                 # get image
                 img = self.display_from_map(layer, cell, colourize=colourize, out_type="np", outsize=out_size,
-                                            border=border, picture_in_picture=picture_in_picture)
+                                            border=border, picture_in_picture=picture_in_picture)[:, :, ::-1]
                 img1 = self.__get_next_image(layer, cell, colourize=colourize, outsize=out_size, border=border,
-                                             picture_in_picture=picture_in_picture)
+                                             picture_in_picture=picture_in_picture)[:, :, ::-1]
+
                 # write text if needed
 
                 if write_text:
@@ -269,31 +271,43 @@ class FeatureExtractor:
         return np.array(img)
 
     def __has_layers(self, layer_no):
-        #check layers are correct
+        # check layers are correct
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
 
     def __create_layers(self, x=None, count=False, intensity=True):
         ##create output laters
+
         if count:
             x = torch.rand(1, 3, 400, 400).to(self.__device)
 
         self.outputs = {}
 
-        counter = 0
+        counter = -1
 
         for name, module in self.model.named_children():
             try:
+                if type(module) == torch.nn.modules.Sequential:
 
-                x = module(x)
+                    for module1 in module.children():
+                        x = module1(x)
 
-                if "Conv" in str(module):
-                    if intensity:
-                        self.outputs[counter] = self.__intensity_sort(x).squeeze(1)
-                    else:
-                        self.outputs[counter] = x
+                        if "Conv" in str(module1):
+                            counter = counter + 1
+                            if intensity:
+                                self.outputs[counter] = self.__intensity_sort(x).squeeze(1)
+                            else:
+                                self.outputs[counter] = x
+                else:
+                    x = module(x)
 
-                    counter = counter + 1
+                    if "Conv" in str(module):
+                        counter = counter + 1
+                        if intensity:
+                            self.outputs[counter] = self.__intensity_sort(x).squeeze(1)
+                        else:
+                            self.outputs[counter] = x
+
 
             except RuntimeError as e:
 
@@ -309,12 +323,12 @@ class FeatureExtractor:
         if type(img) == np.ndarray or type(img) == np.array:
             self.image = Image.fromarray(img)
             img = torch.tensor(img.transpose((2, 0, 1))).unsqueeze(0).float().to(self.__device)
-        elif type(img) == PIL.JpegImagePlugin.JpegImageFile or type(img) == PIL.Image.Image:
+        elif type(img) == PIL.Image.Image:
             self.image = img
             img = torch.tensor(np.array(img).astype(np.uint8).transpose((2, 0, 1))).unsqueeze(0).float().to(
                 self.__device)
         elif type(img) == str:
-            self.img = Image.open(img)
+            self.image = Image.fromarray(cv2.imread(img))
             img = torch.tensor(cv2.imread(img).transpose((2, 0, 1))).unsqueeze(0).float().to(self.__device)
         else:
             raise ValueError("Input Unknown")
@@ -336,7 +350,7 @@ class FeatureExtractor:
         h, w, _ = base_img.shape
 
         # covert top image & get shape
-        top_img = np.array(self.image)
+        top_img = np.array(self.image)[:, :, ::-1]
         t_h, t_w, _ = top_img.shape
 
         # calculate new size
@@ -344,9 +358,14 @@ class FeatureExtractor:
         new_h = new_w * (t_h / t_w)
 
         # fit on new image
-        base_img[int(h - new_h) + 1:, int(w - new_w):, :] = cv2.resize(top_img,
-                                                                       (int(new_w), int(new_h)))  # [:,:,::-1]
-
+        try:
+            base_img[int(h - new_h) + 1:, int(w - new_w):, :] = cv2.resize(top_img,
+                                                                           (int(new_w),
+                                                                            int(new_h)))
+        except ValueError:
+            base_img[int(h - new_h):, int(w - new_w):, :] = cv2.resize(top_img,
+                                                                       (int(new_w),
+                                                                        int(new_h)))
         return base_img
 
     def __return_feature_map(self, layer_no, single=None, border=None, colourize=20):
