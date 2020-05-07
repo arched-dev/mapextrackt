@@ -1,95 +1,41 @@
 import torch
-import torchvision.transforms as transforms
 import numpy as np
 import cv2
 import datetime
 from PIL import Image
 import PIL
 import matplotlib.pyplot as plt
-from PIL import Image, ImageFont, ImageDraw
-import os
+from PIL import Image
 
+from MapExtrackt.functions import get_rows_cols, ResizeMe, convert, weight_images, get_bar, pad_arr, intensity_sort, \
+    colourize_image, draw_text
 
-def get_rows_cols(no,width,height,act_size):
+class Features:
+    features = {}
 
-    act_h = act_size[1]
-    act_w = act_size[0]
-    ratio = act_h / act_w
+    def __init__(self):
+        self.features = {}
+        self.hooks = 0
+        self.names = []
 
-    answers = {}
-    for x in range(100):
-        for y in range(100):
-            if x * y == no:
-                answers[abs(((x*height)/(y*width))-ratio)] = [x, y]
+    def hook_fn(self, module, input, output):
+        if len(input[0].shape) > 2:
+            self.features[self.hooks] = output
+            self.hooks += 1
+            name = str(module).split("(")[0]
+            self.add_name(name)
 
-    return answers[sorted(answers.keys())[0]][0], answers[sorted(answers.keys())[0]][1]
+    def add_name(self, name):
+        self.names.append(name)
 
-class ResizeMe(object):
+    def get_layers_number(self):
+        return len(self.features)
 
-    def __init__(self, desired_size):
-        pass
+    def get_layer_type(self, layer_no):
+        return self.names[layer_no]
 
-        self.desired_size = desired_size
-
-    def __call__(self, img):
-
-        img = np.array(img).astype(np.uint8)
-
-        desired_ratio = self.desired_size[1] / self.desired_size[0]
-        actual_ratio = img.shape[0] / img.shape[1]
-
-        desired_ratio1 = self.desired_size[0] / self.desired_size[1]
-        actual_ratio1 = img.shape[1] / img.shape[0]
-
-        if desired_ratio < actual_ratio:
-            img = cv2.resize(img, (int(self.desired_size[1] * actual_ratio1), self.desired_size[1]), None,
-                             interpolation=cv2.INTER_AREA)
-        elif desired_ratio > actual_ratio:
-            img = cv2.resize(img, (self.desired_size[0], int(self.desired_size[0] * actual_ratio)), None,
-                             interpolation=cv2.INTER_AREA)
-        else:
-            img = cv2.resize(img, (self.desired_size[0], self.desired_size[1]), None, interpolation=cv2.INTER_AREA)
-
-        h, w, _ = img.shape
-
-        new_img = np.zeros((self.desired_size[1], self.desired_size[0], 3))
-
-        hh, ww, _ = new_img.shape
-
-        yoff = int((hh - h) / 2)
-        xoff = int((ww - w) / 2)
-
-        new_img[yoff:yoff + h, xoff:xoff + w, :] = img
-
-        return Image.fromarray(new_img.astype(np.uint8))
-
-
-def normalize_output(img):
-    img = img - img.min()
-    img = img / img.max()
-    return img
-
-
-def convert(seconds):
-    seconds = seconds % (24 * 3600)
-    hour = seconds // 3600
-    seconds %= 3600
-    minutes = seconds // 60
-    seconds %= 60
-
-    return "%d:%02d:%02d" % (hour, minutes, seconds)
-
-
-def weight_images(img, img1, fades=4):
-    for x in np.linspace(0, 1, fades + 1):
-        yield cv2.addWeighted(np.array(img), 1 - x, np.array(img1), x, 0)
-
-
-def get_bar(current, maxx, bar_length=30, bar_load="=", bar_blank="-"):
-    perc = current / maxx
-    bar = int(round(bar_length * perc, 0))
-    blank = int(round(bar_length - (bar_length * perc), 0))
-    return "[" + bar_load * bar + bar_blank * blank + "]" + f" {round(current / maxx * 100, 2)} % "
+    def get_cells(self, layer_no):
+        return self.features[layer_no].shape[1]
 
 
 class FeatureExtractor:
@@ -104,12 +50,22 @@ class FeatureExtractor:
         """
         self.__device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = model.to(self.__device)
-        self.layers = self.__create_layers(count=True) - 1
-        self.outputs = {}
+
+        self.__hooks = None
+        self.layers = None
+        self.outputs = []
+        self.layer_names = []
         self.image = None
 
-    def display_from_map(self, layer_no, cell_no=None, out_type="pil", colourize=20, outsize=None, border=None,
-                         picture_in_picture=True):
+    def __str__(self):
+        return f"<BASE MODEL {str(self.model).split('(')[0]}>\n" \
+               f"Layers: {self.layers}\n" \
+               f"Total Cells: {self.get_total_cells()}\n" \
+               f"Image: {'Not Loaded' if self.image == None else self.image.size}\n" \
+               f"Device: {self.__device}"
+
+    def display_from_map(self, layer_no, cell_no=None, out_type="pil", colourize=20, outsize=(1920,1080), border=0.03,
+                         picture_in_picture=True, write_text="full"):
         """
         returns image map of layer N and [cell n] if specified.
 
@@ -120,6 +76,8 @@ class FeatureExtractor:
         :param outsize: (tuple) The size to reshape the cell in format (w,h)
         :param border: (float in range 0-1) Percentage of cell size to pad with border
         :param picture_in_picture: (bool) Draw original picture over the map
+        :param write_text: (str) "none" for no text "some" for layer size cell number and cell size "full" to also
+        include the module name
         :return:
         """
 
@@ -136,6 +94,18 @@ class FeatureExtractor:
         if picture_in_picture:
             img = self.__write_picture_in_picture(img)
 
+        if write_text.lower() != "none":
+            subtext = ""
+            if write_text.lower() == "full":
+                subtext = self.layer_names[layer_no]
+            if cell_no is None:
+                img = draw_text(img, f"Layer {layer_no: 3} Cells {self.get_cells(layer_no): 4} ( "
+                                            f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                                , subtext)
+            else:
+                img = draw_text(img, f"Layer {layer_no: 3} Cell # {cell_no + 1: 4} ( "
+                                            f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                                , subtext)
         if out_type.lower() == "pil":
             return Image.fromarray(img)
         elif out_type.lower() == "mat":
@@ -144,24 +114,54 @@ class FeatureExtractor:
         else:
             return img
 
-    def set_image(self, img, order_by_intensity=True):
+    def set_image(self, img, order_by_intensity=True, allowed_modules=["Conv"], normalize_layer=False):
         """
-        Used to set the imput image.
+        Used to set the input image.
         Can accept PIL image / numpy array / location of image as string
 
         :param img: (np.array / Pil image / STR path to file) The input file to be analysed
         :param order_by_intensity: (bool) If TRUE features from each layer are reordered by intensity.
-        :return:
+        :param allowed_modules: (list or str) ["conv","relu"]  only extracts conv or relu layers, no need to add full
+        name. i.e "conv" will extract Conv2d layers.
+        "pool" (string not list) extracts all layers with "pool" in the module name.
+        Empty list [] returns all layers.
+        :param normalize_layer: (bool) if true normalizes over whole layer, if false normalization is conducted on an
+        image by image basis.
+        :return: None
         """
 
+        # set hooks
+        # register forward hooks
+        self.__hooks = self.__set_hooks(allowed_modules)
+        self.layers = self.__hooks.get_layers_number()
+        self.outputs = self.__hooks.features
+
+        # convert image
         img = self.__convert_image_to_torch(img)
-        self.__create_layers(img, intensity=order_by_intensity)
+        # infer
+        out = self.model(img)
+        # set total layers
+        self.layers = self.__hooks.get_layers_number()
+        # get outputs
+        self.outputs = self.__hooks.features
+        # set layer names
+        self.layer_names = self.__hooks.names
+        # order by pixel intensity
+
+        # normalize features for viewing
+        self.__normalize_features(normalize_layer)
+
+        if order_by_intensity:
+            outs = {}
+            for k, v in self.outputs.items():
+                outs[k] = intensity_sort(v)
+            self.outputs = outs
 
     def get_total_cells(self):
         ## returns total cells over all convolutions
         tot = 0
         for x in range(self.layers):
-            for y in range(self.get_cells(x)):
+            for y in range(self.get_cells(x) - 1):
                 tot += 1
         return tot
 
@@ -169,11 +169,11 @@ class FeatureExtractor:
         ## gets total cells from given convolutional layer number
 
         self.__has_layers(layer_no)
-        return self.outputs[layer_no].shape[1] - 1
+        return self.outputs[layer_no].shape[2]
 
     def write_video(self, out_size, file_name, colourize=20, border=0.03, fps=40, frames_per_cell=1,
                     fade_frames_between_cells=2, write_text=True, picture_in_picture=True,
-                    frames_per_layer=90, fade_frames_per_layer=20, draw_type="layers"):
+                    frames_per_layer=150, fade_frames_per_layer=40, draw_type="layers"):
         """
         Used to render video output from feature maps
 
@@ -239,10 +239,10 @@ class FeatureExtractor:
 
                 if write_text:
                     # if write text displays layer cell and feature size
-                    img = self.__draw_text(img, f"Layer {layer: 3} - Cells {self.get_cells(layer)+1: 4} - "
+                    img = draw_text(img, f"Layer {layer: 3} - Cells {self.get_cells(layer): 4} - "
                                                 f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
-                    img1 = self.__draw_text(img1, f"Layer {layer: 3} - Cells {self.get_cells(layer)+1: 4} - "
+                    img1 = draw_text(img1, f"Layer {layer: 3} - Cells {self.get_cells(layer): 4} - "
                                                   f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                 for times in range(frames_per_layer):
@@ -267,7 +267,7 @@ class FeatureExtractor:
         if draw_cells:
 
             for layer in range(self.layers):
-                for cell in range(self.get_cells(layer)):
+                for cell in range(self.get_cells(layer) - 1):
 
                     # get image
                     img = self.display_from_map(layer, cell, colourize=colourize, out_type="np", outsize=out_size,
@@ -279,9 +279,9 @@ class FeatureExtractor:
 
                     if write_text:
                         # if write text displays layer cell and feature size
-                        img = self.__draw_text(img, f"Layer {layer} Cell {cell}   - "
+                        img = draw_text(img, f"Layer {layer} Cell {cell}   - "
                                                     f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
-                        img1 = self.__draw_text(img, f"Layer {layer} Cell {cell}   - "
+                        img1 = draw_text(img, f"Layer {layer} Cell {cell}   - "
                                                      f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                     # write static frames
@@ -314,79 +314,64 @@ class FeatureExtractor:
             return self.display_from_map(x + 1, 0, colourize=colourize, out_type="np", outsize=outsize, border=border,
                                          picture_in_picture=picture_in_picture)
 
-    def __draw_text(self, img, text):
-        ## used to draw text onto image
-        img = Image.fromarray(img)
+    def __normalize_features(self, normalize_layer=True):
 
-        # set font size relative to output size
-        size = int(img.size[0] / 20)
+        for k, v in self.outputs.items():
+            if not normalize_layer:
+                for i, img in enumerate(v.squeeze()):
+                    mx = torch.max(img.squeeze())
+                    mn = torch.min(img.squeeze())
+                    changed = img.squeeze() - mn
+                    changed = changed / mx
+                    out = (changed * 255).detach().to("cpu").numpy().astype(np.uint8)
 
-        # draw text using PIL
-        # check for font location
+                    if i == 0:
+                        new_output = out.reshape((out.shape[0], out.shape[1], 1))
+                    else:
+                        new_output = np.concatenate((new_output, out.reshape((out.shape[0], out.shape[1], 1))), 2)
 
-        if os.name == "nt":
-            font = ImageFont.truetype("C:\Windows\Fonts\arial.ttf", size)
-
-        elif os.name == "posix":
-            try:
-                font = ImageFont.truetype("/usr/share/fonts/dejavu/DejaVuSans.ttf", size)
-            except:
-                font = ImageFont.truetype("/usr/share/consolefonts/FOO.psf.gz", size)
-
-        # draw with stroke
-        draw = ImageDraw.Draw(img)
-        draw.text((int(img.size[0] * 0.01), int(img.size[1] * 0.01)), text, (255, 255, 255), font=font, stroke_width=2,
-                  stroke_fill=(0, 0, 0), )
-
-        return np.array(img)
+                self.outputs[k] = new_output
+            else:
+                mx = torch.max(v.squeeze())
+                mn = torch.min(v.squeeze())
+                changed = v.squeeze() - mn
+                changed = changed / mx
+                print(self.__hooks.names[k])
+                out = (changed * 255).detach().to("cpu").numpy().astype(np.uint8).transpose((1, 2, 0))
+                self.outputs[k] = out
 
     def __has_layers(self, layer_no):
         # check layers are correct
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
 
-    def __create_layers(self, x=None, count=False, intensity=True):
-        ##create output laters
+    def __set_hooks(self, allowed_modules):
+        hooker = Features()
+        # extract only allowed modules
+        if type(allowed_modules) == str:
+            allowed_modules = [allowed_modules]
 
-        if count:
-            x = torch.rand(1, 3, 400, 400).to(self.__device)
-
-        self.outputs = {}
-
-        counter = -1
-
-        for name, module in self.model.named_children():
-            try:
-                if type(module) == torch.nn.modules.Sequential:
-
-                    for module1 in module.children():
-                        x = module1(x)
-
-                        if "Conv" in str(module1):
-                            counter = counter + 1
-                            if intensity:
-                                self.outputs[counter] = self.__intensity_sort(x).squeeze(1)
-                            else:
-                                self.outputs[counter] = x
+        allowed_modules = [x.lower() for x in allowed_modules]
+        count = 0
+        for module in self.model.modules():
+            if str(module).count("\n") == 0:
+                name = str(module).split("(")[0]
+                if name.lower().find("linear") >= 0:
+                    break
+                if len(allowed_modules)>0:
+                    for allow in allowed_modules:
+                        if allow in name.lower():
+                            count +=1
+                            module.register_forward_hook(hooker.hook_fn)
                 else:
-                    x = module(x)
+                    count +=1
+                    module.register_forward_hook(hooker.hook_fn)
 
-                    if "Conv" in str(module):
-                        counter = counter + 1
-                        if intensity:
-                            self.outputs[counter] = self.__intensity_sort(x).squeeze(1)
-                        else:
-                            self.outputs[counter] = x
+        #check hooks added
+        if count == 0:
+            raise ValueError(f"No layers extracted with current 'allowed_module' paramater {allowed_modules}")
 
-
-            except RuntimeError as e:
-
-                if str(e).find("size mismatch") < 0:
-                    print("Error !")
-                    print(e)
-
-        if count:
-            return counter
+        return hooker
 
     def __convert_image_to_torch(self, img):
 
@@ -397,22 +382,16 @@ class FeatureExtractor:
             self.image = img
             img = torch.tensor(np.array(img).astype(np.uint8).transpose((2, 0, 1))).unsqueeze(0).float().to(
                 self.__device)
+        elif str(type(img)).find("PIL") >= 0:
+            self.image = img
+            img = torch.tensor(np.array(img).astype(np.uint8).transpose((2, 0, 1))).unsqueeze(0).float().to(
+                self.__device)
         elif type(img) == str:
             self.image = Image.fromarray(cv2.imread(img))
             img = torch.tensor(cv2.imread(img).transpose((2, 0, 1))).unsqueeze(0).float().to(self.__device)
         else:
             raise ValueError("Input Unknown")
         return img
-
-    def __colourize(self, img, colour_type=0):
-
-        if colour_type == 0:
-            base = np.zeros((img.shape[0], img.shape[1], 3))
-            base[:, :, 0] = img
-            base[:, :, 1] = img
-            base[:, :, 2] = img
-        else:
-            return cv2.applyColorMap(img, colour_type, None)
 
     def __write_picture_in_picture(self, base_img, size=0.25):
 
@@ -428,25 +407,31 @@ class FeatureExtractor:
         new_h = new_w * (t_h / t_w)
 
         # fit on new image
-        try:
-            base_img[int(h - new_h) + 1:, int(w - new_w):, :] = cv2.resize(top_img,
-                                                                           (int(new_w),
-                                                                            int(new_h)))
-        except ValueError:
-            base_img[int(h - new_h):, int(w - new_w):, :] = cv2.resize(top_img,
-                                                                       (int(new_w),
-                                                                        int(new_h)))
+
+        for x in range(-2,2):
+            try:
+                base_img[int(h - new_h) + x:, int(w - new_w):, :] = cv2.resize(top_img,
+                                                                               (int(new_w),
+                                                                                int(new_h)))
+            except ValueError:
+                pass
+
         return base_img
 
     def __return_feature_map(self, layer_no, single=None, border=None, colourize=20, out_size=None):
 
+        ### OLD ####
+
         # normalize output for np array
-        out = (normalize_output(self.outputs[layer_no][0, :, :, :]) * 255).to("cpu").detach().numpy().astype(
-            np.uint8).transpose(1, 2, 0)
+        # out = (normalize_output(self.outputs[layer_no][0, :, :, :]) * 255).to("cpu").detach().numpy().astype(
+        #    np.uint8).transpose(1, 2, 0)
+
+        # for x in range()
+        # out = MinMaxScaler((0,255)).fit_transform(self.outputs[layer_no].squeeze()[0].to("cpu").detach().numpy())
 
         # get length
 
-        length = out.shape[2]
+        length = self.outputs[layer_no].shape[2]
 
         # return single cell if needed
         if single != None and type(single) == int:
@@ -454,19 +439,22 @@ class FeatureExtractor:
             if single > length or single < 0:
                 raise ValueError(f"Cell number not valid please select from range 0-{length}")
 
-            img = out[:, :, single]
+            img = self.outputs[layer_no][:, :, single]
 
             # if colourize
-            img = self.__colourize(img, colourize)
+            img = colourize_image(img, colourize)
 
             # if border pad
             if border != None:
-                img = self.__pad_arr(img, border)
+                img = pad_arr(img, border)
 
             return img
 
         # get ideal shape of output
-        x, y = get_rows_cols(length, width=out.shape[1], height=out.shape[0], act_size=out_size)
+        x, y = get_rows_cols(length,
+                             width=self.outputs[layer_no].shape[1],
+                             height=self.outputs[layer_no].shape[0],
+                             act_size=out_size)
 
         count = 0
 
@@ -475,14 +463,14 @@ class FeatureExtractor:
             # loop columns
             for idy in range(y):
                 # store image
-                img = out[:, :, count]
+                img = self.outputs[layer_no][:, :, count]
 
                 # if colourize
-                img = self.__colourize(img, colourize)
+                img = colourize_image(img, colourize)
 
                 # if border pad
                 if border != None:
-                    img = self.__pad_arr(img, border)
+                    img = pad_arr(img, border)
 
                 if idy == 0:
                     colu = img
@@ -499,26 +487,3 @@ class FeatureExtractor:
 
         # return np.array
         return rows
-
-    def __intensity_sort(self, tensor):
-
-        ## used to sort the mappings by pixel intensity.
-
-        pixel_mean = {}
-
-        for i, x in enumerate(tensor.view(1, tensor.size(1), -1).squeeze()):
-            pixel_mean[i] = torch.mean(x)
-
-        pixel_mean = {k: v for k, v in sorted(pixel_mean.items(), key=lambda item: item[1], reverse=True)}
-
-        return tensor[:, [list(pixel_mean.keys())], :, :]
-
-    def __pad_arr(self, img, size):
-
-        imgchange = Image.fromarray(img)
-
-        pad = int(imgchange.size[0] * size)
-        if pad <= 0:
-            pad = 1
-
-        return np.array(transforms.functional.pad(img=imgchange, padding=pad, fill=(0, 0, 0)))

@@ -88,3 +88,16 @@ pip install -e .
 For more - view the jupyter notebook with extra usage examples.
 
 [Examples](./examples/examples.ipynb)
+
+-----------------
+Todo List
+-----------------
+
+- [ ] Add the ability to slice the class i.e  FeatureExtractor[1,3]
+- [ ] Show parameters on the image 
+
+-----------------
+Author
+-----------------
+
+Created solely by me, but open to suggestions/ colaborators.

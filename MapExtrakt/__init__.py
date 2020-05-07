@@ -1,1 +1,0 @@
-from MapExtrakt.extractor import FeatureExtractor
