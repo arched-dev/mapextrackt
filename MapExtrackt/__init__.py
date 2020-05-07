@@ -1,0 +1,1 @@
+from MapExtrackt.extractor import FeatureExtractor
