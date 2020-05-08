@@ -10,6 +10,7 @@ from PIL import Image
 from MapExtrackt.functions import get_rows_cols, ResizeMe, convert, weight_images, get_bar, pad_arr, intensity_sort, \
     colourize_image, draw_text
 
+
 class Features:
     features = {}
 
@@ -49,70 +50,174 @@ class FeatureExtractor:
 
         """
         self.__device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
         self.model = model.to(self.__device)
+        self.name = str(self.model).split('(')[0]
 
         self.__hooks = None
         self.layers = None
         self.outputs = []
         self.layer_names = []
         self.image = None
+        self.__set_default_exp_attrs()
+
+    def __set_default_exp_attrs(self):
+        self.colourize = 20
+        self.outsize = (800, 600)
+        self.out_type = "pil"
+        self.border = 0.03
+        self.picture_in_picture = True
+        self.write_text = "full"
+
+    def set_output(self, out_type=None, colourize=None, outsize=None, border=None,
+                   picture_in_picture=None, write_text=None):
+        if colourize is not None:
+            assert colourize in [x for x in range(1, 21)], "Colourize value not in correct range of 1-20"
+            self.colourize = colourize
+
+        if outsize is not None or outsize == False:
+            assert (type(outsize) == tuple and len(
+                outsize) == 2) or outsize == False, "Outsize value not tuple of (Width,Height)"
+            if outsize == False:
+                self.outsize = None
+            else:
+                self.outsize = outsize
+
+        if out_type is not None:
+            assert out_type.lower() in ["pil", "np", "mat"], 'out_type value not in "pil","np","mat"]'
+            self.out_type = out_type
+
+        if border is not None:
+            assert type(border) == float and 0.001 < border < 1, "Border not float in range 0-1"
+            self.border = border
+
+        if picture_in_picture is not None:
+            assert type(picture_in_picture) == bool, "picture_in_picture value not bool"
+            self.picture_in_picture = picture_in_picture
+
+        if write_text is not None:
+            assert type(write_text) == str and write_text in ["full", "some", "none"], 'write_text value not bool or ' \
+                                                                                       'not in ["full","some","none"]'
+            self.write_text = write_text
 
     def __str__(self):
-        return f"<BASE MODEL {str(self.model).split('(')[0]}>\n" \
+        return f"<BASE MODEL: {self.name}>\n" \
+               f"---------------------------\n" \
+               f"----- Class  settings -----\n" \
+               f"---------------------------\n" \
                f"Layers: {self.layers}\n" \
                f"Total Cells: {self.get_total_cells()}\n" \
                f"Image: {'Not Loaded' if self.image == None else self.image.size}\n" \
-               f"Device: {self.__device}"
+               f"Device: {self.__device}\n" \
+               f"---------------------------\n" \
+               f"-- Image output settings --\n" \
+               f"---------------------------\n" \
+               f"Output Size: {self.outsize}\n" \
+               f"Out Type: {self.out_type}\n" \
+               f"Border Size: {self.border * 100}%\n" \
+               f"Picture in picture: {self.picture_in_picture}\n" \
+               f"Colourize Style: {self.colourize}\n" \
+               f"Write Text: {self.write_text}"
 
-    def display_from_map(self, layer_no, cell_no=None, out_type="pil", colourize=20, outsize=(1920,1080), border=0.03,
-                         picture_in_picture=True, write_text="full"):
+    def __getitem__(self, item):
+
+        # used to slice the class
+        if type(item) == int:
+            if 0 > item or item > self.layers or type(self.layers) != int:
+                raise ValueError(f"Layer Number not in range 0-{self.layers} or not INT\n"
+                                 f"(Slicing layers not supported)")
+            return self.display_from_map(layer_no=item, cell_no=None)
+
+        if len(item) == 2:
+            return self.display_from_map(layer_no=item[0], cell_no=item[1])
+        else:
+            raise ValueError("Too many indices")
+
+    def display_from_map(self, layer_no, cell_no=None, out_type=None, colourize=None, outsize=None, border=None,
+                         picture_in_picture=None, write_text=None):
         """
         returns image map of layer N and [cell n] if specified.
+
+        Class settings are updated
 
         :param layer_no: (int) The specific layer number to output
         :param cell_no: (int) The specific channel that you want to extract  DEFAULT None = Return full map
         :param out_type: (str) "pil" - for pillow image, "mat" for matplotlib, "np" for numpy array
         :param colourize: (int) from 1-20 applies different colour maps 0 == False or B.W Image
-        :param outsize: (tuple) The size to reshape the cell in format (w,h)
+        :param outsize: (tuple) The size to reshape the cell in format (w,h)  FALSE defaults to actual size of cell, or stacked cells that form layer.
         :param border: (float in range 0-1) Percentage of cell size to pad with border
         :param picture_in_picture: (bool) Draw original picture over the map
-        :param write_text: (str) "none" for no text "some" for layer size cell number and cell size "full" to also
-        include the module name
-        :return:
+        :param write_text: (str) [default] "full" includes layer,cell, cell size and layer type to output
+        "some" only includes layer,cell, cell size
+        "none" does not write text to output
+        :return: output image
         """
+
+        self.set_output(out_type=out_type,
+                        colourize=colourize,
+                        outsize=outsize,
+                        border=border,
+                        picture_in_picture=picture_in_picture,
+                        write_text=write_text)
 
         self.__has_layers(layer_no)
 
         # get image map
-        img = self.__return_feature_map(layer_no, single=cell_no, border=border, colourize=colourize, out_size=outsize)
+        img = self.__return_feature_map(layer_no, single=cell_no)
 
         # return type
 
-        if outsize != None:
-            img = np.array(ResizeMe(outsize)(Image.fromarray(img)))
+        if self.outsize != None:
+            img = np.array(ResizeMe(self.outsize)(Image.fromarray(img)))
 
-        if picture_in_picture:
+        if self.picture_in_picture:
             img = self.__write_picture_in_picture(img)
 
-        if write_text.lower() != "none":
+        if self.write_text.lower() != "none":
             subtext = ""
-            if write_text.lower() == "full":
-                subtext = self.layer_names[layer_no]
-            if cell_no is None:
-                img = draw_text(img, f"Layer {layer_no: 3} Cells {self.get_cells(layer_no): 4} ( "
-                                            f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                                , subtext)
-            else:
-                img = draw_text(img, f"Layer {layer_no: 3} Cell # {cell_no + 1: 4} ( "
-                                            f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                                , subtext)
-        if out_type.lower() == "pil":
+            img = self.__write_text_(img, layer_no, cell_no)
+
+        if self.out_type.lower() == "pil":
             return Image.fromarray(img)
-        elif out_type.lower() == "mat":
+        elif self.out_type.lower() == "mat":
             fig = plt.figure()
             plt.imshow(img)
         else:
             return img
+
+    def __write_text_(self, img, layer_no, cell_no):
+
+        if self.write_text.lower() == "full":
+            subtext = self.layer_names[layer_no]
+        if cell_no is None:
+            img = draw_text(img, f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} ( "
+                                 f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                            , subtext)
+        elif type(cell_no) == slice:
+            if cell_no.start == None and cell_no.stop == None:
+                img = draw_text(img, f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} ("
+                                     f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+
+                            , subtext)
+            elif cell_no.start == None:
+                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {'0':<4}-{cell_no.stop:<4} ( "
+                                     f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                                , subtext)
+
+            elif cell_no.stop == None:
+                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{self.get_cells(layer_no):<4}"
+                                     f" ( {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                                , subtext)
+
+            else:
+                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{cell_no.stop:<4} ( "
+                                 f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                            , subtext)
+        else:
+            img = draw_text(img, f"Layer {layer_no:<3} Cell # {cell_no + 1:<4} ( "
+                                 f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                            , subtext)
+        return img
 
     def set_image(self, img, order_by_intensity=True, allowed_modules=["Conv"], normalize_layer=False):
         """
@@ -129,6 +234,9 @@ class FeatureExtractor:
         image by image basis.
         :return: None
         """
+
+        if self.__device == "cuda":
+            torch.cuda.empty_cache()
 
         # set hooks
         # register forward hooks
@@ -229,7 +337,7 @@ class FeatureExtractor:
                                                 border=border,
                                                 picture_in_picture=picture_in_picture)
                     img1 = self.display_from_map(layer_no=layer + 1, out_type="np", colourize=colourize,
-                                                 outsize=out_size, border=border,
+                                                 outsize=self.out_size, border=border,
                                                  picture_in_picture=picture_in_picture)
                     img1_base = img1.copy()
                 else:
@@ -240,10 +348,10 @@ class FeatureExtractor:
                 if write_text:
                     # if write text displays layer cell and feature size
                     img = draw_text(img, f"Layer {layer: 3} - Cells {self.get_cells(layer): 4} - "
-                                                f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+                                         f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                     img1 = draw_text(img1, f"Layer {layer: 3} - Cells {self.get_cells(layer): 4} - "
-                                                  f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+                                           f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                 for times in range(frames_per_layer):
                     out.write(img[:, :, ::-1])
@@ -270,19 +378,22 @@ class FeatureExtractor:
                 for cell in range(self.get_cells(layer) - 1):
 
                     # get image
-                    img = self.display_from_map(layer, cell, colourize=colourize, out_type="np", outsize=out_size,
-                                                border=border, picture_in_picture=picture_in_picture)[:, :, ::-1]
-                    img1 = self.__get_next_image(layer, cell, colourize=colourize, outsize=out_size, border=border,
-                                                 picture_in_picture=picture_in_picture)[:, :, ::-1]
+                    img = self.display_from_map(layer, cell, colourize=self.colourize, out_type="np",
+                                                outsize=self.outsize,
+                                                border=self.border, picture_in_picture=self.picture_in_picture)[:, :,
+                          ::-1]
+                    img1 = self.__get_next_image(layer, cell, colourize=self.colourize, outsize=self.outsize,
+                                                 border=self.border,
+                                                 picture_in_picture=self.picture_in_picture)[:, :, ::-1]
 
                     # write text if needed
 
-                    if write_text:
+                    if self.write_text:
                         # if write text displays layer cell and feature size
                         img = draw_text(img, f"Layer {layer} Cell {cell}   - "
-                                                    f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+                                             f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
                         img1 = draw_text(img, f"Layer {layer} Cell {cell}   - "
-                                                     f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
+                                              f"{self.outputs[layer].size()[2]}x{self.outputs[layer].size()[3]}")
 
                     # write static frames
                     for static in range(frames_per_cell):
@@ -358,16 +469,16 @@ class FeatureExtractor:
                 name = str(module).split("(")[0]
                 if name.lower().find("linear") >= 0:
                     break
-                if len(allowed_modules)>0:
+                if len(allowed_modules) > 0:
                     for allow in allowed_modules:
                         if allow in name.lower():
-                            count +=1
+                            count += 1
                             module.register_forward_hook(hooker.hook_fn)
                 else:
-                    count +=1
+                    count += 1
                     module.register_forward_hook(hooker.hook_fn)
 
-        #check hooks added
+        # check hooks added
         if count == 0:
             raise ValueError(f"No layers extracted with current 'allowed_module' paramater {allowed_modules}")
 
@@ -408,7 +519,7 @@ class FeatureExtractor:
 
         # fit on new image
 
-        for x in range(-2,2):
+        for x in range(-2, 2):
             try:
                 base_img[int(h - new_h) + x:, int(w - new_w):, :] = cv2.resize(top_img,
                                                                                (int(new_w),
@@ -418,45 +529,84 @@ class FeatureExtractor:
 
         return base_img
 
-    def __return_feature_map(self, layer_no, single=None, border=None, colourize=20, out_size=None):
+    def __return_feature_map(self, layer_no, single=None):
+        # get total layer cells
+        total_cells = self.get_cells(layer_no)-1
+        stepper = 1
+        # get ideal shape of output
 
-        ### OLD ####
+        # for when sliced
+        if type(single) == slice:
+            #for slice like [:] display all
+            if single.start == None and single.stop == None:
+                length = self.outputs[layer_no].shape[2]
+                count = 0
+                count_to = total_cells
+            #for slice like [:10]
+            elif single.start == None and type(single.stop) == int:
+                length = single.stop
+                count = 0
+                count_to = single.stop
+            # for slight like [2:]
+            elif type(single.start) == int and single.stop == None:
+                length = total_cells - single.start
+                count = single.start
+                count_to = total_cells
+            #for slice like [3:10]
 
-        # normalize output for np array
-        # out = (normalize_output(self.outputs[layer_no][0, :, :, :]) * 255).to("cpu").detach().numpy().astype(
-        #    np.uint8).transpose(1, 2, 0)
+            else:
+                length = single.stop - single.start
+                count = single.start
+                count_to = single.stop
 
-        # for x in range()
-        # out = MinMaxScaler((0,255)).fit_transform(self.outputs[layer_no].squeeze()[0].to("cpu").detach().numpy())
+            #set step size
 
-        # get length
+            if single.step == None:
+                pass
+            elif single.step < 0:
+                count, count_to = count_to, count
+                if count == total_cells:
+                    count = total_cells
+                stepper = single.step
+            elif single.step >= 1:
+                stepper = single.step
 
-        length = self.outputs[layer_no].shape[2]
+            if length < 0:
+                length *= -1
+            if hasattr(single,"step"):
+                if not single.step is None and single.step != -1:
+                    length = int(length/abs(single.step))
 
-        # return single cell if needed
-        if single != None and type(single) == int:
 
-            if single > length or single < 0:
-                raise ValueError(f"Cell number not valid please select from range 0-{length}")
+        # for single retrevial
+        elif single != None and 0 <= single < total_cells:
 
             img = self.outputs[layer_no][:, :, single]
 
             # if colourize
-            img = colourize_image(img, colourize)
+            if self.colourize > 0:
+                img = colourize_image(img, self.colourize)
 
             # if border pad
-            if border != None:
-                img = pad_arr(img, border)
+            if self.border is not None or self.border != 0:
+                img = pad_arr(img, self.border)
 
             return img
 
-        # get ideal shape of output
+        # for layer output
+        elif single == None:
+            length = self.outputs[layer_no].shape[2]
+            count = 0
+            count_to = total_cells
+        # for error
+        elif (single < 0 or single > total_cells) and single is not None:
+            raise ValueError(f"Cell number not valid please select from range 0-{total_cells}")
+
+
         x, y = get_rows_cols(length,
                              width=self.outputs[layer_no].shape[1],
                              height=self.outputs[layer_no].shape[0],
-                             act_size=out_size)
-
-        count = 0
+                             act_size=self.outsize)
 
         # loop rows
         for idx in range(x):
@@ -466,11 +616,12 @@ class FeatureExtractor:
                 img = self.outputs[layer_no][:, :, count]
 
                 # if colourize
-                img = colourize_image(img, colourize)
+                if self.colourize > 0:
+                    img = colourize_image(img, self.colourize)
 
                 # if border pad
-                if border != None:
-                    img = pad_arr(img, border)
+                if self.border != None:
+                    img = pad_arr(img, self.border)
 
                 if idy == 0:
                     colu = img
@@ -478,7 +629,13 @@ class FeatureExtractor:
                     # stack horizontally
                     colu = np.hstack([colu, img])
 
-                count += 1
+                if count + stepper > count_to and stepper > 0:
+                    break
+                elif count + stepper < count_to and stepper < 0:
+                    break
+                else:
+                    count += stepper
+
             # stack vertically
             if idx == 0:
                 rows = colu
