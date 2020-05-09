@@ -1,4 +1,4 @@
-# MapExtrakt
+# MapExtrackt
 ![Release](https://img.shields.io/github/v/release/lewis-morris/mapextrackt "Release")
 > Convolutional Neural Networks Are Beautiful
 
