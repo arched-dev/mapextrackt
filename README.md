@@ -70,7 +70,7 @@ fe.write_video(out_size=(1200,800), file_name="output.avi", time_for_layer=60, t
 ```
 
 <a href="https://www.youtube.com/watch?v=LZTGIYxczFc&feature=youtu.be" target="_blank">
-    <img src="https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/youtube.jpg" alt="MapExtrackt" border="10" />
+    <img src="https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/youtube.png" alt="MapExtrackt" border="10" />
 </a>
 
 ------------------------------------------------
