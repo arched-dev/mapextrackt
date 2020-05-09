@@ -93,8 +93,8 @@ pip install mapextrackt
 or build from source in terminal 
 
 ```
-git clone https://github.com/lewis-morris/mapextrackt
-cd mapextrackt
+git clone https://github.com/lewis-morris/mapextrackt &&\
+cd mapextrackt &&\
 pip install -e .
 ```
 
@@ -109,6 +109,7 @@ Todo List
 - [ ] Enable individual cells to be added to video 
 - [x] Add video parameters such as duration in seconds.
 - [ ] Clean up code 
+- [ ] Make speed improvements
 
 -----------------
 Author

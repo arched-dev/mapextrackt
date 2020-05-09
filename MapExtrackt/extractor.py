@@ -25,10 +25,12 @@ class Features:
     def hook_fn(self, module, input, output):
         if len(output[0].shape) > 2:
             if output[0].shape[2] > 1:
-
                 self.features[self.hooks] = output
                 self.hooks += 1
-                name = str(module).split("(")[0]
+                if str(module).find("\n") >=0:
+                    name = str(module).split("(")[0] + " (Block)"
+                else:
+                    name = str(module).split("(")[0]
                 self.add_name(name)
 
     def add_name(self, name):
@@ -74,37 +76,6 @@ class FeatureExtractor:
         self.picture_in_picture = True
         self.write_text = "full"
 
-    def set_output(self, out_type=None, colourize=None, outsize=None, border=None,
-                   picture_in_picture=None, write_text=None):
-        if colourize is not None:
-            assert colourize in [x for x in range(0, 21)], "Colourize value not in correct range of 0-20"
-            self.colourize = colourize
-
-        if outsize is not None or outsize == False:
-            assert (type(outsize) == tuple and len(
-                outsize) == 2) or outsize == False, "Outsize value not tuple of (Width,Height)"
-            if outsize == False:
-                self.outsize = None
-            else:
-                self.outsize = outsize
-
-        if out_type is not None:
-            assert out_type.lower() in ["pil", "np", "mat"], 'out_type value not in "pil","np","mat"]'
-            self.out_type = out_type
-
-        if border is not None:
-            assert type(border) == float and 0.001 < border < 1, "Border not float in range 0-1"
-            self.border = border
-
-        if picture_in_picture is not None:
-            assert type(picture_in_picture) == bool, "picture_in_picture value not bool"
-            self.picture_in_picture = picture_in_picture
-
-        if write_text is not None:
-            assert type(write_text) == str and write_text in ["full", "some", "none"], 'write_text value not bool or ' \
-                                                                                       'not in ["full","some","none"]'
-            self.write_text = write_text
-
     def __str__(self):
 
         try:
@@ -143,6 +114,37 @@ class FeatureExtractor:
             return self.display_from_map(layer_no=item[0], cell_no=item[1])
         else:
             raise ValueError("Too many indices")
+
+    def set_output(self, out_type=None, colourize=None, outsize=None, border=None,
+                   picture_in_picture=None, write_text=None):
+        if colourize is not None:
+            assert colourize in [x for x in range(0, 21)], "Colourize value not in correct range of 0-20"
+            self.colourize = colourize
+
+        if outsize is not None or outsize == False:
+            assert (type(outsize) == tuple and len(
+                outsize) == 2) or outsize == False, "Outsize value not tuple of (Width,Height)"
+            if outsize == False:
+                self.outsize = None
+            else:
+                self.outsize = outsize
+
+        if out_type is not None:
+            assert out_type.lower() in ["pil", "np", "mat"], 'out_type value not in "pil","np","mat"]'
+            self.out_type = out_type
+
+        if border is not None:
+            assert type(border) == float and 0.001 < border < 1, "Border not float in range 0-1"
+            self.border = border
+
+        if picture_in_picture is not None:
+            assert type(picture_in_picture) == bool, "picture_in_picture value not bool"
+            self.picture_in_picture = picture_in_picture
+
+        if write_text is not None:
+            assert type(write_text) == str and write_text in ["full", "some", "none"], 'write_text value not bool or ' \
+                                                                                       'not in ["full","some","none"]'
+            self.write_text = write_text
 
     def display_from_map(self, layer_no, cell_no=None, out_type=None, colourize=None, outsize=None, border=None,
                          picture_in_picture=None, write_text=None):
@@ -196,15 +198,17 @@ class FeatureExtractor:
         else:
             return img
 
-    def __write_text_(self, img, layer_no, cell_no):
+    def __write_text_(self, img, layer_no, cell_no, flip=False):
+
+        # TODO add option to flip text to set_options
 
         if self.write_text.lower() == "full":
             subtext = self.name + " - " + self.layer_names[layer_no]
 
         if cell_no is None:
-            img = draw_text(img, f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} ( "
-                                 f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                            , subtext)
+            text = f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} ( " \
+                   f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+
         elif type(cell_no) == slice:
             if cell_no.step == None:
                 step_text = ""
@@ -212,33 +216,33 @@ class FeatureExtractor:
                 step_text = f"Step {cell_no.step}"
 
             if cell_no.start == None and cell_no.stop == None:
-                img = draw_text(img, f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} {step_text} ( "
-                                     f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
+                text = f"Layer {layer_no:<3} Cells {self.get_cells(layer_no):<4} {step_text} ( " \
+                       f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
 
-                                , subtext)
             elif cell_no.start == None:
-                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {'0':<4}-{cell_no.stop:<4} {step_text} ( "
-                                     f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                                , subtext)
+                text = f"Layer {layer_no:<3} Cell Range {'0':<4}-{cell_no.stop:<4} {step_text} (" \
+                       f" {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
 
             elif cell_no.stop == None:
-                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{self.get_cells(layer_no):<4}"
-                                     f" {step_text} ( {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                                , subtext)
+                text = f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{self.get_cells(layer_no):<4} " \
+                       f"{step_text} ( {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
 
             else:
-                img = draw_text(img, f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{cell_no.stop:<4} {step_text}"
-                                     f" ( {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                                , subtext)
+                text = f"Layer {layer_no:<3} Cell Range {cell_no.start:<4}-{cell_no.stop:<4} {step_text}" \
+                       f" ( {self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
         else:
-            img = draw_text(img, f"Layer {layer_no:<3} Cell # {cell_no + 1:<4} ( "
-                                 f"{self.outputs[layer_no].shape[0]}x{self.outputs[layer_no].shape[1]} )"
-                            , subtext)
+            text = f"Layer {layer_no:<3} Cell # {cell_no + 1:<4} ( {self.outputs[layer_no].shape[0]}x" \
+                   f"{self.outputs[layer_no].shape[1]} )"
+
+        if flip:
+            text, subtext = subtext, text
+        img = draw_text(img, text, subtext)
+
         return img
 
     def set_image(self, img,
                   order_by_intensity=True,
-                  allowed_modules=["Conv"],
+                  allowed_modules=[],
                   normalize_layer=False,
                   tensor_normalization_mean=[0.485, 0.456, 0.406],
                   tensor_normalization_std=[0.229, 0.224, 0.225]):
@@ -250,8 +254,8 @@ class FeatureExtractor:
         :param img: (np.array / Pil image / STR path to file) The input file to be analysed
         :param order_by_intensity: (bool) If TRUE features from each layer are reordered by intensity.
         :param allowed_modules: (list or str) ["conv","relu"]  only extracts conv or relu layers, no need to add full
-        name. i.e "conv" will extract Conv2d layers.
-        "pool" (string not list) extracts all layers with "pool" in the module name.
+        name. i.e "conv" will extract Conv2d layers. "pool" would extract any layer is "pool" in the name.
+        For models constructed in blocks you can use "block" if you want to extract only the block outputs.
         Empty list [] returns all layers.
         :param normalize_layer: (bool) The output tensor of each layer need normalizing between 0-255 for viewing.
         True conducts this over the whole layer, if false normalization is conducted on an
@@ -267,7 +271,7 @@ class FeatureExtractor:
         if self.__device == "cuda":
             torch.cuda.empty_cache()
 
-        #set tensor normalisation
+        # set tensor normalisation
         if type(tensor_normalization_std) == list and len(tensor_normalization_std) == 3:
             self.__tensor_norm_std = tensor_normalization_std
         else:
@@ -302,7 +306,6 @@ class FeatureExtractor:
         if order_by_intensity:
             for k, v in self.outputs.items():
                 self.outputs[k] = intensity_sort(v)
-
 
     def get_total_cells(self):
         ## returns total cells over all convolutions
@@ -396,17 +399,17 @@ class FeatureExtractor:
         # if draw layers first
         if draw_layers:
             for layer in range(0, self.layers):
-                if layer < self.layers-1:
+                if layer < self.layers - 1:
                     img = self.display_from_map(layer_no=layer, out_type="np",
                                                 colourize=self.colourize,
                                                 outsize=self.outsize,
                                                 border=self.border,
-                                                picture_in_picture=self.picture_in_picture)[:,:,::-1]
+                                                picture_in_picture=self.picture_in_picture)[:, :, ::-1]
                     img1 = self.display_from_map(layer_no=layer + 1, out_type="np",
                                                  colourize=self.colourize,
                                                  outsize=self.outsize,
                                                  border=self.border,
-                                                 picture_in_picture=self.picture_in_picture)[:,:,::-1]
+                                                 picture_in_picture=self.picture_in_picture)[:, :, ::-1]
                     img1_base = img1.copy()
                 else:
                     # to deal with last image.
@@ -430,8 +433,8 @@ class FeatureExtractor:
 
                 # print status
                 print(
-                    f"\rDrawing Layers {count:<5}/{self.layers }   Total Time Taken {convert(total_time):10} Time Left"
-                    f" {convert((total_time / count) * (self.layers  - count)):10} {get_bar(count, self.layers + 1)} ",
+                    f"\rDrawing Layers {count:<5}/{self.layers}   Total Time Taken {convert(total_time):10} Time Left"
+                    f" {convert((total_time / count) * (self.layers - count)):10} {get_bar(count, self.layers + 1)} ",
                     end="")
 
         count = 0
@@ -523,22 +526,29 @@ class FeatureExtractor:
     def __set_hooks(self, allowed_modules):
         hooker = Features()
         # extract only allowed modules
+
+
         if type(allowed_modules) == str:
             allowed_modules = [allowed_modules]
 
         allowed_modules = [x.lower() for x in allowed_modules]
         count = 0
         for module in self.model.modules():
-            if str(module).count("\n") == 0:
+            name = ""
+            if count != 0 and type(module) is not torch.nn.Sequential and str(module).find("\n")>=0:
+                name = str(module).split("(")[0] + " (Block)"
+            elif str(module).find("\n") < 0:
                 name = str(module).split("(")[0]
-                if name.lower().find("linear") >= 0:
-                    break
+
+            if name.lower().find("linear") >= 0:
+                break
+            if name != "":
                 if len(allowed_modules) > 0:
                     for allow in allowed_modules:
                         if allow in name.lower():
                             count += 1
                             module.register_forward_hook(hooker.hook_fn)
-                else:
+                elif allowed_modules == []:
                     count += 1
                     module.register_forward_hook(hooker.hook_fn)
 
