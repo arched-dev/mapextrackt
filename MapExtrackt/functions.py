@@ -2,7 +2,8 @@ import os
 
 import cv2
 import numpy as np
-from PIL import Image, ImageFont, ImageDraw
+import scipy
+from PIL import Image, ImageFont, ImageDraw, ImageStat
 from torchvision import transforms as transforms
 
 
@@ -112,31 +113,59 @@ def pad_arr(img, size):
     if pad <= 0:
         pad = 1
 
-    return np.array(transforms.functional.pad(img=imgchange, padding=pad, fill=(0, 0, 0)))
+    if len(imgchange.size) == 3:
+        return np.array(transforms.functional.pad(img=imgchange, padding=pad, fill=(0, 0, 0)))
+    else:
+        return np.array(transforms.functional.pad(img=imgchange, padding=pad, fill=0))
 
 
 def intensity_sort(image_layer):
-
+    from scipy import stats
     ## used to sort the mappings by pixel intensity.
 
-    pixel_mean = {}
+    #TODO Check this - sorting could be better !!
+    ### I have tried many options to get them to organise nicely.
+    ### This is the best i can come up with for now. That offers the best sorting to the eye
 
     pixel_mean = {}
     for i in range(image_layer.shape[2]):
-        pixel_mean[i] = np.mean(image_layer[:, :, i])
+
+        img = image_layer[:, :, i]
+        #blured = blur(img)
+        #mean = np.mean(blured)
+        #median = np.median(blured)
+        #mode = stats.mode(blured.reshape(blured.shape[0]*blured.shape[1]))[0].item()
+        #cv2.calcHist(blured,)
+        #img_mean = np.mean(cv2.calcHist([blured], [0], None, [256], [0, 256]).ravel())
+        blured = blur(img)
+        mean = brightness(blured)
+        median = np.median(blured.ravel())
+        pixel_mean[i] = (mean+median)
+
 
     pixel_mean = {k: v for k, v in sorted(pixel_mean.items(), key=lambda item: item[1], reverse=True)}
 
     return image_layer[:, :, list(pixel_mean.keys())]
 
+def brightness( im_file ):
+   im = Image.fromarray(im_file).convert('L')
+   stat = ImageStat.Stat(im)
+   return stat.mean[0]
+
+def blur(img):
+
+    for x in range(2):
+        img = cv2.blur(img, (5,5))
+    return img
 
 def colourize_image(img, colour_type=0):
 
     if colour_type == 0:
-        base = np.zeros((img.shape[0], img.shape[1], 3))
+        base = np.zeros((img.shape[0], img.shape[1], 3)).astype(np.uint8)
         base[:, :, 0] = img
         base[:, :, 1] = img
         base[:, :, 2] = img
+        return base
     else:
         return cv2.applyColorMap(img, colour_type, None)
 

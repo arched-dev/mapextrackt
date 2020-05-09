@@ -1,5 +1,5 @@
 # MapExtrakt
-
+![Release](https://img.shields.io/github/v/release/lewis-morris/mapextrackt "Release")
 > Convolutional Neural Networks Are Beautiful
 
 We all take our eyes for granted, we glance at an object for an instant and our brains can identify with ease.
@@ -12,56 +12,73 @@ Computers have a harder time, but modern advances with convolutional neural netw
 
 Computers are beautiful, neural networks are beautiful. And the maps they create to determine what makes a cat a cat are beautiful.
 
-### MapExtrakt makes viewing feature maps a breeze.
+----------------------------
 
-#### Catch a glimpse of how a computer can see.
+## MapExtrakt makes viewing feature maps a breeze.
+
+### Catch a glimpse of how a computer can see.
+
+
+# MapExtrakt Usage
+
+----------------------------
+> First import your model
 
 ```python
-
-# load a model 
 import torchvision
-model = torchvision.models.vgg16(pretrained=True)
+model = torchvision.models.vgg19(pretrained=True)
+```
 
-#import FeatureExtractor
-from MapExtrakt import FeatureExtractor
+> Import MapExtract's Feature Extractor and load in the model
 
-#load the model and image
+```python
+from MapExtrackt import FeatureExtractor
 fe = FeatureExtractor(model)
-fe.set_image("cat.jpg")
-
-#gather maps
-img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=True)
-img.save("example_output.jpg")
-img
-
 ```
-![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/example_output.jpg "Example Output")
 
-### View Single Cells At a Time
+> Set image to be analysed - input can be PIL Image, Numpy array or filepath. We are using the path
 
 ```python
-
-#gather maps
-img = fe.display_from_map(layer_no=2, out_type="pil", colourize=20, outsize=(1000,500), border=0.03, picture_in_picture=False)
-img.save("example_output.jpg")
-img
-
+fe.set_image("pug.jpg")
 ```
-![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/example_output2.jpg "Example Output")
-
-
-### Export Cells Of Each Layer To Video
+> View Layers
 
 ```python
-#gather maps
-fe.write_video(out_size=(1000,500), file_name="output.mp4", 
-               write_text=True, picture_in_picture=True, draw_type="both")
+fe.display_from_map(layer_no=1)
 ```
 
-<a href="https://www.youtube.com/watch?v=AvLTVaV5ID8&feature=youtu.be" target="_blank">
-    <img src="https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/youtube.jpg" alt="MapExtrakt" border="10" />
+![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/output.jpg "Example Output")
+
+> View Single Cells At a Time
+
+```python
+fe.display_from_map(layer_no=2, cell_no=4)
+```
+![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/output1.jpg "Example Output")
+
+> Slice the class to get a range of cells  (Layer 2 Cells 0-9)
+
+```python
+fe[2,0:10]
+```
+![Example Output](https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/output2.jpg "Example Output")
+
+> Or Export Layers To Video
+
+```python
+fe.write_video(out_size=(1200,800), file_name="output.avi", time_for_layer=60, transition_perc_layer=0.2)
+```
+
+<a href="https://www.youtube.com/watch?v=LZTGIYxczFc&feature=youtu.be" target="_blank">
+    <img src="https://raw.githubusercontent.com/lewis-morris/mapextrackt/master/examples/youtube.jpg" alt="MapExtrackt" border="10" />
 </a>
 
+------------------------------------------------
+# More Examples
+
+For LOTS more - view the jupyter notebook.
+
+[Examples](./examples/examples.ipynb)
 
 ------------------------------------------------
 
@@ -70,7 +87,7 @@ fe.write_video(out_size=(1000,500), file_name="output.mp4",
 ## It's as easy as PyPI
 
 ```
-pip install mapextrakt
+pip install mapextrackt
 ```
 
 or build from source in terminal 
@@ -83,21 +100,22 @@ pip install -e .
 
 ------------------------------------------------
 
-# More Examples
-
-For more - view the jupyter notebook with extra usage examples.
-
-[Examples](./examples/examples.ipynb)
-
------------------
 Todo List
 -----------------
 
-- [ ] Add the ability to slice the class i.e  FeatureExtractor[1,3]
+- [x] Add the ability to slice the class i.e  FeatureExtractor[1,3]
 - [ ] Show parameters on the image 
+- [x] Fix video generation
+- [ ] Enable individual cells to be added to video 
+- [x] Add video parameters such as duration in seconds.
+- [ ] Clean up code 
 
 -----------------
 Author
 -----------------
 
-Created solely by me, but open to suggestions/ colaborators.
+Created by me, initially to view the outputs for my own pleasure. 
+
+If anyone has any suggestions or requests please send them over I'd be more than happy to consider.
+
+lewis.morris@gmail.com
