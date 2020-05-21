@@ -8,7 +8,7 @@ However distorted the information may be, we do a pretty good job at it.
 Low light, obscured vision, poor eyesight... There are a myriad of situations where conditions are poor but still we manage to understand what an object it.
 Context helps, but we humans were created with sight in mind.
 
-Computers have a harder time, but modern advances with convolutional neural networks are making this task a reality and have now surpassed human level accuracy.
+Computers have a harder time, but modern advances with convolutional neural networks are making this task a reality.
 
 Computers are amazing, the neural networks and maps they create are beautiful.
 
