@@ -561,7 +561,7 @@ class FeatureExtractor:
     def __convert_image_to_torch(self, img):
 
         if type(img) == np.ndarray or type(img) == np.array:
-            self.image = Image.fromarray(img)
+            self.image = Image.fromarray(img.astype(np.uint8))
 
         elif type(img) == PIL.Image.Image:
             self.image = img
