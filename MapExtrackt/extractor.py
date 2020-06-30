@@ -560,8 +560,13 @@ class FeatureExtractor:
 
     def __convert_image_to_torch(self, img):
 
-        if type(img) == np.ndarray or type(img) == np.array:
+        if (type(img) == np.ndarray or type(img) == np.array) and (img.shape[2] == 3 or img.shape[2] == 4):
             self.image = Image.fromarray(img.astype(np.uint8))
+
+        ## added for multi channel arrays (3+)
+        elif type(img) == np.ndarray or type(img) == np.array and img.shape[2] > 3:
+            arr = ((img[:, :, :] - img[:, :, :].min()) / (img[:, :, :].max() - img[:, :, :].min()) * 255).astype(np.uint8)
+            return torch.tensor(arr.transpose([2,0,1]))
 
         elif type(img) == PIL.Image.Image:
             self.image = img
