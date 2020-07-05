@@ -190,8 +190,7 @@ class FeatureExtractor:
                 img = self.__write_picture_in_picture(img)
             except:
                 warnings.warn("Your input has more than 3 channels and cannot be displayed. To stop seeing this message please switch off writing picture in picture.")
-                # This is here because some people are passing in arrays that have more channels than
-
+               
         if self.write_text.lower() != "none":
             subtext = ""
             img = self.__write_text_(img, layer_no, cell_no)
