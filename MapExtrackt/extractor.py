@@ -56,9 +56,9 @@ class FeatureExtractor:
         :param model: (pytorch model)
 
         """
-        self.__device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        self.model = model.to(self.__device)
+        self.model = model.to(self.device)
         self.name = str(self.model).split('(')[0]
 
         self.__hooks = None
@@ -90,7 +90,7 @@ class FeatureExtractor:
                f"Layers: {self.layers}\n" \
                f"Total Cells: {cells}\n" \
                f"Image: {'Not Loaded' if self.image == None else self.image.size}\n" \
-               f"Device: {self.__device}\n" \
+               f"Device: {self.device}\n" \
                f"---------------------------\n" \
                f"-- Image output settings --\n" \
                f"---------------------------\n" \
@@ -268,7 +268,7 @@ class FeatureExtractor:
         :return: None
         """
 
-        if self.__device == "cuda":
+        if self.device == "cuda":
             torch.cuda.empty_cache()
 
         # set tensor normalisation
@@ -291,7 +291,7 @@ class FeatureExtractor:
         # convert image
         img = self.__convert_image_to_torch(img)
         # infer
-        out = self.model(img.unsqueeze(0).to(self.__device))
+        out = self.model(img.unsqueeze(0).to(self.device))
         # set total layers
         self.layers = self.__hooks.get_layers_number()
         # get outputs
@@ -566,7 +566,7 @@ class FeatureExtractor:
         ## added for multi channel arrays (3+)
         elif type(img) == np.ndarray or type(img) == np.array and img.shape[2] > 3:
             arr = ((img[:, :, :] - img[:, :, :].min()) / (img[:, :, :].max() - img[:, :, :].min()) * 255).astype(np.uint8)
-            return torch.tensor(arr.transpose([2,0,1]))
+            return torch.tensor(arr.transpose([2,0,1])).float()
 
         elif type(img) == PIL.Image.Image:
             self.image = img
