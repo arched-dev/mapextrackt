@@ -183,7 +183,7 @@ class FeatureExtractor:
         if self.outsize != None:
             img = np.array(ResizeMe(self.outsize)(Image.fromarray(img)))
 
-        if self.picture_in_picture:
+        if self.picture_in_picture and img.shape[2] <= 4:
             img = self.__write_picture_in_picture(img)
 
         if self.write_text.lower() != "none":
