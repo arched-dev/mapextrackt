@@ -1,3 +1,5 @@
+import warnings
+
 import torch
 import numpy as np
 import cv2
@@ -183,8 +185,11 @@ class FeatureExtractor:
         if self.outsize != None:
             img = np.array(ResizeMe(self.outsize)(Image.fromarray(img)))
 
-        if self.picture_in_picture and img.shape[2] <= 4:
-            img = self.__write_picture_in_picture(img)
+        if self.picture_in_picture:
+            try:
+                img = self.__write_picture_in_picture(img)
+            except:
+                warnings.warn("Your input has more than 3 channels and cannot be displayed. To stop seeing this message please switch off writing picture in picture.")# This is here because some people are passing in arrays that have more channels than
 
         if self.write_text.lower() != "none":
             subtext = ""
