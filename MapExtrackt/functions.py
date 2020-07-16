@@ -181,7 +181,7 @@ def draw_text(img, text, subtext=None):
     # check for font location
 
     if os.name == "nt":
-        font_loc = "C:\Windows\Fonts\arial.ttf"
+        font_loc = "C:/Windows/Fonts/Arial.ttf"
     elif os.name == "posix":
         if os.path.isfile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
             font_loc = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
