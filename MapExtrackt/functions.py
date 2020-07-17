@@ -191,7 +191,6 @@ def draw_text(img, text, subtext=None):
             font_loc = "/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf"
         elif os.path.isfile("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"):
             font_loc = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-    else:
 
     font = ImageFont.truetype(font_loc, size)
     smaller_font = ImageFont.truetype(font_loc, smaller_size)
