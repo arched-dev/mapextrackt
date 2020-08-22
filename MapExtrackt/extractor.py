@@ -530,10 +530,10 @@ class FeatureExtractor:
 
     def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], ignore_first=False):
         name = ""
-        for module in seq.modules():
+        for module in seq.children():
             if not ignore_first:
-                #if type(module) is torch.nn.Sequential:
-                #    count = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,ignore_first=True)
+                if type(module) is torch.nn.Sequential:
+                    count = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,ignore_first=True)
 
                 if type(module) is not torch.nn.Sequential and str(module).find("\n") >= 0:
                     name = str(module).split("(")[0] + " (Block)"
