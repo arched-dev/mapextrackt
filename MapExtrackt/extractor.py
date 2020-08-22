@@ -528,6 +528,34 @@ class FeatureExtractor:
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
 
+    def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], ignore_first=False):
+        name = ""
+        for module in seq.modules():
+            if not ignore_first:
+                #if type(module) is torch.nn.Sequential:
+                #    count = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,ignore_first=True)
+
+                if type(module) is not torch.nn.Sequential and str(module).find("\n") >= 0:
+                    name = str(module).split("(")[0] + " (Block)"
+                elif str(module).find("\n") < 0:
+                    name = str(module).split("(")[0]
+
+                if name.lower().find("linear") >= 0:
+                    break
+
+                if name != "":
+                    if len(allowed_modules) > 0:
+                        for allow in allowed_modules:
+                            if allow in name.lower():
+                                count += 1
+                                module.register_forward_hook(hooker.hook_fn)
+                    elif allowed_modules == []:
+                        count += 1
+                        module.register_forward_hook(hooker.hook_fn)
+            else:
+                ignore_first = False
+        return count
+
     def __set_hooks(self, allowed_modules):
         hooker = Features()
         # extract only allowed modules
@@ -537,25 +565,8 @@ class FeatureExtractor:
             allowed_modules = [allowed_modules]
 
         allowed_modules = [x.lower() for x in allowed_modules]
-        count = 0
-        for module in self.model.modules():
-            name = ""
-            if count != 0 and type(module) is not torch.nn.Sequential and str(module).find("\n")>=0:
-                name = str(module).split("(")[0] + " (Block)"
-            elif str(module).find("\n") < 0:
-                name = str(module).split("(")[0]
 
-            if name.lower().find("linear") >= 0:
-                break
-            if name != "":
-                if len(allowed_modules) > 0:
-                    for allow in allowed_modules:
-                        if allow in name.lower():
-                            count += 1
-                            module.register_forward_hook(hooker.hook_fn)
-                elif allowed_modules == []:
-                    count += 1
-                    module.register_forward_hook(hooker.hook_fn)
+        count = self.__loop_internal_modules_set_hook(hooker, self.model,0, allowed_modules)
 
         # check hooks added
         if count == 0:
