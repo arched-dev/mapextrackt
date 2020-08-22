@@ -9,7 +9,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='mapextrackt',
-    version='0.4.8.3',
+    version='0.4.8.4',
     packages=['MapExtrackt'],
     url='https://github.com/lewis-morris/mapextrackt',
     license='MIT',

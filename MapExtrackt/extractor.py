@@ -248,6 +248,7 @@ class FeatureExtractor:
     def set_image(self, img,
                   order_by_intensity=True,
                   allowed_modules=[],
+                  allowed_depth=None,
                   normalize_layer=False,
                   tensor_normalization_mean=[0.485, 0.456, 0.406],
                   tensor_normalization_std=[0.229, 0.224, 0.225]):
@@ -262,6 +263,7 @@ class FeatureExtractor:
         name. i.e "conv" will extract Conv2d layers. "pool" would extract any layer is "pool" in the name.
         For models constructed in blocks you can use "block" if you want to extract only the block outputs.
         Empty list [] returns all layers.
+        :param allowed_depth: (int) How deep the search for layers will go. I.e if there are multiple sequential blocks nested. None- will search all layers.
         :param normalize_layer: (bool) The output tensor of each layer need normalizing between 0-255 for viewing.
         True conducts this over the whole layer, if false normalization is conducted on an
         image by image basis.
@@ -289,7 +291,7 @@ class FeatureExtractor:
 
         # set hooks
         # register forward hooks
-        self.__hooks = self.__set_hooks(allowed_modules)
+        self.__hooks = self.__set_hooks(allowed_modules,allowed_depth)
         self.layers = self.__hooks.get_layers_number()
         self.outputs = self.__hooks.features
 
@@ -528,35 +530,37 @@ class FeatureExtractor:
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
 
-    def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], ignore_first=False):
+    def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], allowed_depth=None, current_depth=0):
         name = ""
         for module in seq.children():
-            if not ignore_first:
-                if type(module) is torch.nn.Sequential:
-                    count = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,ignore_first=True)
 
-                if type(module) is not torch.nn.Sequential and str(module).find("\n") >= 0:
-                    name = str(module).split("(")[0] + " (Block)"
-                elif str(module).find("\n") < 0:
-                    name = str(module).split("(")[0]
+            if str(module).find("\n") >= 0:
+                name = str(module).split("(")[0] + " (Block)"
+            elif str(module).find("\n") < 0:
+                name = str(module).split("(")[0]
 
-                if name.lower().find("linear") >= 0:
-                    break
+            if name.lower().find("linear") >= 0:
+                break
 
-                if name != "":
-                    if len(allowed_modules) > 0:
-                        for allow in allowed_modules:
-                            if allow in name.lower():
-                                count += 1
-                                module.register_forward_hook(hooker.hook_fn)
-                    elif allowed_modules == []:
-                        count += 1
-                        module.register_forward_hook(hooker.hook_fn)
-            else:
-                ignore_first = False
-        return count
+            if name != "":
+                if len(allowed_modules) > 0:
+                    for allow in allowed_modules:
+                        if allow in name.lower():
+                            count += 1
+                            module.register_forward_hook(hooker.hook_fn)
+                elif allowed_modules == []:
+                    count += 1
+                    module.register_forward_hook(hooker.hook_fn)
 
-    def __set_hooks(self, allowed_modules):
+            if sum([True for mod in module.children()]) > 0:
+                current_depth +=1
+                if allowed_depth is None or current_depth <= allowed_depth:
+                    count, current_depth = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,current_depth)
+                current_depth -= 1
+
+        return count,current_depth
+
+    def __set_hooks(self, allowed_modules, allowed_depth):
         hooker = Features()
         # extract only allowed modules
 
@@ -566,7 +570,7 @@ class FeatureExtractor:
 
         allowed_modules = [x.lower() for x in allowed_modules]
 
-        count = self.__loop_internal_modules_set_hook(hooker, self.model,0, allowed_modules)
+        count, current_depth = self.__loop_internal_modules_set_hook(hooker, self.model, 0, allowed_modules, allowed_depth)
 
         # check hooks added
         if count == 0:
