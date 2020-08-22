@@ -534,6 +534,12 @@ class FeatureExtractor:
         name = ""
         for module in seq.children():
 
+            if sum([True for mod in module.children()]) > 0:
+                current_depth +=1
+                if allowed_depth is None or current_depth <= allowed_depth:
+                    count, current_depth = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,allowed_depth,current_depth)
+                current_depth -= 1
+
             if str(module).find("\n") >= 0:
                 name = str(module).split("(")[0] + " (Block)"
             elif str(module).find("\n") < 0:
@@ -552,11 +558,7 @@ class FeatureExtractor:
                     count += 1
                     module.register_forward_hook(hooker.hook_fn)
 
-            if sum([True for mod in module.children()]) > 0:
-                current_depth +=1
-                if allowed_depth is None or current_depth <= allowed_depth:
-                    count, current_depth = self.__loop_internal_modules_set_hook(hooker, module,count,allowed_modules,current_depth)
-                current_depth -= 1
+
 
         return count,current_depth
 
