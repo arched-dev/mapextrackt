@@ -20,7 +20,7 @@ Why not have an explore?
 
 ### Catch a glimpse of how a computer can see.
 
-
+ 
 # MapExtrakt Usage
 
 ----------------------------
