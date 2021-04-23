@@ -182,16 +182,22 @@ def draw_text(img, text, subtext=None):
 
     if os.name == "nt":
         font_loc = "C:/Windows/Fonts/Arial.ttf"
-    elif os.name == "posix":
-        if os.path.isfile("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"):
-            font_loc = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-        elif os.path.isfile("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"):
-            font_loc = "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"
-        elif os.path.isfile("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"):
-            font_loc = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-        elif os.path.isfile("/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf"):
-            font_loc = "/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf"
 
+    else:
+        # changed this as some people having issue locating the fonts.
+        # possibly still an issue for people using SAGEMAKER cant find any way to access the file system.
+
+        #last entry is a possible fix
+
+        font_locs = ["/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                     "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+                     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                     "/usr/share/fonts/truetype/humor-sans/Humor-Sans.ttf",
+                     "/usr/share/fonts/dejavu/DejaVuSans.ttf"]
+
+        for font in font_locs:
+            if os.path.isfile(font):
+                font_loc = font
 
     font = ImageFont.truetype(font_loc, size)
     smaller_font = ImageFont.truetype(font_loc, smaller_size)
