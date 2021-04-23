@@ -1,5 +1,8 @@
 # MapExtrackt
+
+[![Downloads](https://pepy.tech/badge/mapextrackt)](https://pepy.tech/project/mapextrackt)
 ![Release](https://img.shields.io/github/v/release/lewis-morris/mapextrackt "Release")
+
 > Convolutional Neural Networks Are Beautiful
 
 We all take our eyes for granted, we glance at an object for an instant and our brains can identify with ease.
