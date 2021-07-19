@@ -27,7 +27,7 @@ Why not have an explore?
 # MapExtrakt Usage
 
 ----------------------------
-> First import your model
+> First import / gather your model (this does not have to be a pretrained pytorch model).
 
 ```python
 import torchvision
