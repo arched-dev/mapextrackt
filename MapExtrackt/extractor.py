@@ -312,7 +312,7 @@ class FeatureExtractor:
 
         if order_by_intensity:
             for k, v in self.outputs.items():
-                if type(v) == torch.Tensor:
+                if type(v) == np.ndarray:
                     self.outputs[k] = intensity_sort(v)
 
     def get_total_cells(self):
@@ -530,6 +530,8 @@ class FeatureExtractor:
         # check layers are correct
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
+        if type(self.outputs[layer_no]) == tuple:
+            raise ValueError(f"Layer {layer_no} - {self.layer_names[layer_no]} is a tuple. Please set allowed_modules to avoid the module.")
 
     def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], allowed_depth=None, current_depth=0):
         name = ""
