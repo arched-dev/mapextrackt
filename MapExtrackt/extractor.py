@@ -312,7 +312,8 @@ class FeatureExtractor:
 
         if order_by_intensity:
             for k, v in self.outputs.items():
-                self.outputs[k] = intensity_sort(v)
+                if type(v) == np.ndarray:
+                    self.outputs[k] = intensity_sort(v)
 
     def get_total_cells(self):
         ## returns total cells over all convolutions
@@ -504,8 +505,8 @@ class FeatureExtractor:
     def __normalize_features(self, normalize_layer=True):
 
         for k, v in self.outputs.items():
-            if not normalize_layer:
-                for i, img in enumerate(v.squeeze()):
+            if not normalize_layer and type(v) == torch.Tensor:
+                for i, img in enumerate(v.squeeze(0)):
                     mx = torch.max(img.squeeze())
                     mn = torch.min(img.squeeze())
                     changed = (img.squeeze() - mn) / (mx - mn)
@@ -516,12 +517,12 @@ class FeatureExtractor:
                         new_output = np.concatenate((new_output, out.reshape((out.shape[0], out.shape[1], 1))), 2)
 
                 self.outputs[k] = new_output
-            else:
-                mx = torch.max(v.squeeze())
-                mn = torch.min(v.squeeze())
-                changed = v.squeeze() - mn
+            elif type(v) == torch.Tensor:
+                mx = torch.max(v.squeeze(0))
+                mn = torch.min(v.squeeze(0))
+                changed = v.squeeze(0) - mn
                 changed = changed / mx
-                print(self.__hooks.names[k])
+                # print(self.__hooks.names[k])
                 out = (changed * 255).detach().to("cpu").numpy().astype(np.uint8).transpose((1, 2, 0))
                 self.outputs[k] = out
 
@@ -529,6 +530,8 @@ class FeatureExtractor:
         # check layers are correct
         if layer_no < 0 or layer_no > self.layers:
             raise ValueError(f"Layer number not available. Please choose layer between range 0-{self.layers}")
+        if type(self.outputs[layer_no]) == tuple:
+            raise ValueError(f"Layer {layer_no} - {self.layer_names[layer_no]} is a tuple. Please set allowed_modules to avoid the module.")
 
     def __loop_internal_modules_set_hook(self, hooker, seq, count, allowed_modules=[], allowed_depth=None, current_depth=0):
         name = ""
